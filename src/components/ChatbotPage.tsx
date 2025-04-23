@@ -15,12 +15,10 @@ const ChatbotPage: React.FC = () => {
     
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-
+    const [apiKey, setApiKey] = useState<string>('');
 
     const { isRecording, startRecording, stopRecording, audioData } = useAudioRecorder();
     const transcriber = useTranscriber();
-
-    const DUMMY_ENDPOINT = '/openai';
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -28,6 +26,14 @@ const ChatbotPage: React.FC = () => {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+
+    // Load API key from localStorage if available
+    useEffect(() => {
+        const savedApiKey = localStorage.getItem('openai_api_key');
+        if (savedApiKey) {
+            setApiKey(savedApiKey);
+        }
+    }, []);
 
     // Handle transcription when audioData is available
     useEffect(() => {
@@ -61,27 +67,31 @@ const ChatbotPage: React.FC = () => {
         const text = messageText || inputText;
         if (!text.trim()) return;
 
+        if (!apiKey) {
+            alert('Please enter your OpenAI API key first.');
+            return;
+        }
+
         const newMessage: Message = { role: 'user', content: text };
         const updatedMessages = [...messages, newMessage];
         setMessages(updatedMessages);
         setInputText('');
         setIsLoading(true);
-
-        const OPENAI_API_KEY = "###";
         
         try {
             const response = await axios.post(
                 'https://api.openai.com/v1/chat/completions',
                 {
-                    model:"gpt-4o-mini",
+                    model: "gpt-4o-mini",
                     messages: updatedMessages,
-                },{
+                },
+                {
                     headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`,
                     },
                 }
-            )
+            );
             const assistantResponse = response.data.choices[0].message.content;
             const assistantMessage: Message = {
                 role: 'assistant',
@@ -89,10 +99,10 @@ const ChatbotPage: React.FC = () => {
             };
             setMessages((prevMessages) => [...prevMessages, assistantMessage]);
         } catch (error) {
-            console.error('Error communicating with backend:', error);
+            console.error('Error communicating with OpenAI:', error);
             const errorMessage: Message = {
                 role: 'assistant',
-                content: 'Error: Unable to get a response.',
+                content: 'Error: Unable to get a response from OpenAI API.',
             };
             setMessages((prevMessages) => [...prevMessages, errorMessage]);
         } finally {
@@ -108,8 +118,25 @@ const ChatbotPage: React.FC = () => {
         }
     };
 
+    const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newApiKey = e.target.value;
+        setApiKey(newApiKey);
+        localStorage.setItem('openai_api_key', newApiKey);
+    };
+
     return (
         <div className='flex flex-col h-screen'>
+            {/* API Key Input */}
+            <div className='p-4 bg-gray-100'>
+                <input
+                    type='password'
+                    className='w-full border border-gray-300 rounded px-3 py-2'
+                    value={apiKey}
+                    onChange={handleApiKeyChange}
+                    placeholder='Enter your OpenAI API key'
+                />
+            </div>
+            
             {/* Chat Messages */}
             <div className='flex-1 overflow-auto p-4'>
                 {messages.slice(1).map((msg, index) => (
