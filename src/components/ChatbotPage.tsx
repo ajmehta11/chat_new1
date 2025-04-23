@@ -16,11 +16,14 @@ const ChatbotPage: React.FC = () => {
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [apiKey, setApiKey] = useState<string>('');
+    const [isSpeaking, setIsSpeaking] = useState(false);
+    const [speechEnabled, setSpeechEnabled] = useState(true);
 
     const { isRecording, startRecording, stopRecording, audioData } = useAudioRecorder();
     const transcriber = useTranscriber();
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const speechSynthesis = window.speechSynthesis;
 
     // Scroll to the bottom when messages update
     useEffect(() => {
@@ -42,6 +45,53 @@ const ChatbotPage: React.FC = () => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [audioData]);
+
+    // Stop speaking when component unmounts
+    useEffect(() => {
+        return () => {
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+        };
+    }, []);
+
+    const speakText = (text: string) => {
+        if (!speechEnabled) return;
+
+        // Cancel any ongoing speech
+        if (speechSynthesis.speaking) {
+            speechSynthesis.cancel();
+        }
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+
+        // Get available voices and select one
+        const voices = speechSynthesis.getVoices();
+        if (voices.length > 0) {
+            // Try to find a female voice if available
+            const femaleVoice = voices.find(voice => 
+                voice.name.includes('female') || 
+                voice.name.includes('Female') || 
+                voice.name.includes('Google UK English Female')
+            );
+            utterance.voice = femaleVoice || voices[0];
+        }
+
+        speechSynthesis.speak(utterance);
+    };
+
+    const toggleSpeech = () => {
+        setSpeechEnabled(prev => !prev);
+        
+        // Stop any ongoing speech if disabling
+        if (speechEnabled && speechSynthesis.speaking) {
+            speechSynthesis.cancel();
+            setIsSpeaking(false);
+        }
+    };
 
     const handleTranscription = async (audioBuffer: AudioBuffer) => {
         setIsLoading(true);
@@ -98,6 +148,9 @@ const ChatbotPage: React.FC = () => {
                 content: assistantResponse,
             };
             setMessages((prevMessages) => [...prevMessages, assistantMessage]);
+            
+            // Speak the assistant's response
+            speakText(assistantResponse);
         } catch (error) {
             console.error('Error communicating with OpenAI:', error);
             const errorMessage: Message = {
@@ -147,13 +200,22 @@ const ChatbotPage: React.FC = () => {
                     } mb-2`}
                 >
                     <div
-                    className={`rounded-lg p-2 max-w-xs ${
+                    className={`rounded-lg p-2 max-w-xs md:max-w-md lg:max-w-lg ${
                         msg.role === 'user'
                         ? 'bg-blue-500 text-white'
                         : 'bg-gray-300 text-black'
                     }`}
                     >
                     {msg.content}
+                    {msg.role === 'assistant' && (
+                        <button 
+                            onClick={() => speakText(msg.content)}
+                            className="ml-2 text-xs text-blue-600"
+                            title="Read this message aloud"
+                        >
+                            🔊
+                        </button>
+                    )}
                     </div>
                 </div>
                 ))}
@@ -177,13 +239,24 @@ const ChatbotPage: React.FC = () => {
                     }
                 />
 
+                {/* Speech Toggle Button */}
+                <button
+                    onClick={toggleSpeech}
+                    className={`p-2 rounded-full mr-2 ${
+                        speechEnabled ? 'bg-green-500' : 'bg-gray-400'
+                    } text-white`}
+                    title={speechEnabled ? 'Disable text-to-speech' : 'Enable text-to-speech'}
+                >
+                    {speechEnabled ? '🔊' : '🔇'}
+                </button>
+
                 {/* Record Button */}
                 <button
                     onClick={handleRecordButtonClick}
                     disabled={isLoading || transcriber.isModelLoading || transcriber.isBusy}
                     className={`mr-2 p-2 rounded-full text-white ${
                         isRecording ? 'bg-red-500' : 'bg-green-500'
-                    }`}
+                    } ${(isLoading || transcriber.isModelLoading || transcriber.isBusy) ? 'opacity-50' : ''}`}
                 >
                     {isRecording ? 'End' : 'Record'}
                 </button>
@@ -198,6 +271,13 @@ const ChatbotPage: React.FC = () => {
                     Send
                 </button>
             </div>
+
+            {/* Speaking Indicator */}
+            {isSpeaking && (
+                <div className="fixed bottom-20 right-4 bg-blue-500 text-white px-3 py-1 rounded-full animate-pulse">
+                    Speaking...
+                </div>
+            )}
         </div>
     );
 };
