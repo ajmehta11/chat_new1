@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     react()
   ],
-  base: '/ODAC/'
+  base: '/chat_new/'
 })
 // vite.config.js
 // import { defineConfig } from 'vite';
