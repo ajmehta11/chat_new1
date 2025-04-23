@@ -15,7 +15,8 @@ const ChatbotPage: React.FC = () => {
     
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [apiKey, setApiKey] = useState<string>('');
+    // Get API key from environment variable
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY || '';
 
     const { isRecording, startRecording, stopRecording, audioData } = useAudioRecorder();
     const transcriber = useTranscriber();
@@ -26,14 +27,6 @@ const ChatbotPage: React.FC = () => {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
-
-    // Load API key from localStorage if available
-    useEffect(() => {
-        const savedApiKey = localStorage.getItem('openai_api_key');
-        if (savedApiKey) {
-            setApiKey(savedApiKey);
-        }
-    }, []);
 
     // Handle transcription when audioData is available
     useEffect(() => {
@@ -68,7 +61,7 @@ const ChatbotPage: React.FC = () => {
         if (!text.trim()) return;
 
         if (!apiKey) {
-            alert('Please enter your OpenAI API key first.');
+            alert('API key is not set. Please add the VITE_OPENAI_API_KEY environment variable.');
             return;
         }
 
@@ -118,24 +111,14 @@ const ChatbotPage: React.FC = () => {
         }
     };
 
-    const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newApiKey = e.target.value;
-        setApiKey(newApiKey);
-        localStorage.setItem('openai_api_key', newApiKey);
-    };
-
     return (
         <div className='flex flex-col h-screen'>
-            {/* API Key Input */}
-            <div className='p-4 bg-gray-100'>
-                <input
-                    type='password'
-                    className='w-full border border-gray-300 rounded px-3 py-2'
-                    value={apiKey}
-                    onChange={handleApiKeyChange}
-                    placeholder='Enter your OpenAI API key'
-                />
-            </div>
+            {/* API Key Status */}
+            {!apiKey && (
+                <div className='p-2 bg-yellow-100 text-yellow-800 text-center'>
+                    OpenAI API key is not set. Please add the VITE_OPENAI_API_KEY environment variable.
+                </div>
+            )}
             
             {/* Chat Messages */}
             <div className='flex-1 overflow-auto p-4'>
@@ -167,23 +150,22 @@ const ChatbotPage: React.FC = () => {
                     className='flex-1 border border-gray-300 rounded px-3 py-2 mr-2'
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
-                    disabled={isLoading || isRecording || transcriber.isBusy}
+                    disabled={isLoading || isRecording || transcriber.isBusy || !apiKey}
                     placeholder={
-                        transcriber.isModelLoading
-                        ? 'Loading model...'
-                        : transcriber.isBusy
-                        ? 'Transcribing...'
-                        : 'Type your message'
+                        !apiKey ? 'API key not set' :
+                        transcriber.isModelLoading ? 'Loading model...' :
+                        transcriber.isBusy ? 'Transcribing...' :
+                        'Type your message'
                     }
                 />
 
                 {/* Record Button */}
                 <button
                     onClick={handleRecordButtonClick}
-                    disabled={isLoading || transcriber.isModelLoading || transcriber.isBusy}
+                    disabled={isLoading || transcriber.isModelLoading || transcriber.isBusy || !apiKey}
                     className={`mr-2 p-2 rounded-full text-white ${
                         isRecording ? 'bg-red-500' : 'bg-green-500'
-                    }`}
+                    } ${(!apiKey) ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                     {isRecording ? 'End' : 'Record'}
                 </button>
@@ -191,7 +173,7 @@ const ChatbotPage: React.FC = () => {
                 <button
                     onClick={() => handleSend()}
                     disabled={
-                        isLoading || !inputText.trim() || isRecording || transcriber.isBusy
+                        isLoading || !inputText.trim() || isRecording || transcriber.isBusy || !apiKey
                     }
                     className='px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50'
                 >
