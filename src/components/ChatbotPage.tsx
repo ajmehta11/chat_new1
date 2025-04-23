@@ -12,7 +12,7 @@ const ChatbotPage: React.FC = () => {
     const [messages, setMessages] = useState<Message[]>([
         {
             role: 'system',
-            content: `You are a therapist. Speak like a real person in a conversation—empathetic, relaxed, and human. No bold text or bullet points. Keep your responses to 3–4 sentences. Imagine you're sitting across from someone in a calm space, just listening and gently responding.
+            content: `You are a therapist. Speak like a real person in a conversation—empathetic, relaxed, and human. No bold text or bullet points. Imagine you're sitting across from someone in a calm space, just listening and gently responding.
 
 Here is a sample exchange to guide your tone and style:
 User: I have been feeling really isolated lately.
@@ -25,6 +25,7 @@ Bot: That sounds really difficult. What small step do you think might help you f
 Keep it conversational and human—like you are talking with a friend who needs support.`
         },
     ]);
+};
 
     
     const [inputText, setInputText] = useState('');
@@ -77,13 +78,9 @@ Keep it conversational and human—like you are talking with a friend who needs 
             speechSynthesis.cancel();
         }
 
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.onstart = () => setIsSpeaking(true);
-        utterance.onend = () => setIsSpeaking(false);
-        utterance.onerror = () => setIsSpeaking(false);
-
         // Get available voices and select one
         const voices = speechSynthesis.getVoices();
+        let selectedVoice = null;
         if (voices.length > 0) {
             // Try to find a female voice if available
             const femaleVoice = voices.find(voice => 
@@ -91,10 +88,43 @@ Keep it conversational and human—like you are talking with a friend who needs 
                 voice.name.includes('Female') || 
                 voice.name.includes('Google UK English Female')
             );
-            utterance.voice = femaleVoice || voices[0];
+            selectedVoice = femaleVoice || voices[0];
         }
-
-        speechSynthesis.speak(utterance);
+        
+        // Split text into sentences to handle long responses
+        const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+        
+        // Function to speak chunks sequentially
+        const speakChunks = (chunks: string[], index = 0) => {
+            if (index >= chunks.length || !speechEnabled) {
+                setIsSpeaking(false);
+                return;
+            }
+            
+            const utterance = new SpeechSynthesisUtterance(chunks[index]);
+            
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            }
+            
+            if (index === 0) {
+                setIsSpeaking(true);
+            }
+            
+            utterance.onend = () => {
+                // Continue with next chunk
+                speakChunks(chunks, index + 1);
+            };
+            
+            utterance.onerror = () => {
+                setIsSpeaking(false);
+            };
+            
+            speechSynthesis.speak(utterance);
+        };
+        
+        // Start speaking the first chunk
+        speakChunks(sentences);
     };
 
     const toggleSpeech = () => {
