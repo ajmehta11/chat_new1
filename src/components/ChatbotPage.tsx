@@ -25,7 +25,6 @@ Bot: That sounds really difficult. What small step do you think might help you f
 Keep it conversational and human—like you are talking with a friend who needs support.`
         },
     ]);
-};
 
     
     const [inputText, setInputText] = useState('');
