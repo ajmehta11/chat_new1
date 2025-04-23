@@ -67,7 +67,7 @@ const ChatbotPage: React.FC = () => {
         setInputText('');
         setIsLoading(true);
 
-        const OPENAI_API_KEY = "##";
+        const OPENAI_API_KEY = "###";
         
         try {
             const response = await axios.post(
